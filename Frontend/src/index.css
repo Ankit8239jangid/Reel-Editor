@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Styles ───────────────────────────────────────────────── */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0a0a0f;
+  color: #e4e4e7;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Glass Card ──────────────────────────────────────────────────── */
+@layer components {
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+      0 2px 4px -1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card-sm {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold rounded-xl
+           hover:from-primary-500 hover:to-primary-400 
+           transition-all duration-300 ease-out
+           shadow-lg hover:shadow-glow
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-dark-500 text-dark-50 font-medium rounded-lg
+           border border-dark-400 hover:border-dark-300 hover:bg-dark-400
+           transition-all duration-200
+           active:scale-95;
+  }
+
+  .btn-danger {
+    @apply px-3 py-1.5 bg-red-500/10 text-red-400 font-medium rounded-lg
+           border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40
+           transition-all duration-200
+           active:scale-95 text-sm;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-dark-700 border border-dark-400 rounded-xl
+           text-white placeholder-dark-200 
+           focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500/30
+           transition-all duration-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-500/10 text-amber-400 border border-amber-500/20;
+  }
+
+  .badge-error {
+    @apply badge bg-red-500/10 text-red-400 border border-red-500/20;
+  }
+
+  .badge-info {
+    @apply badge bg-primary-500/10 text-primary-400 border border-primary-500/20;
+  }
+}
+
+/* ─── Gradient Backgrounds ────────────────────────────────────────── */
+.bg-mesh {
+  background-color: #0a0a0f;
+  background-image:
+    radial-gradient(at 20% 20%, rgba(92, 124, 250, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 10%, rgba(167, 139, 250, 0.06) 0px, transparent 50%),
+    radial-gradient(at 60% 80%, rgba(34, 211, 238, 0.05) 0px, transparent 50%);
+}
+
+/* ─── Animations ──────────────────────────────────────────────────── */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+}
+
+/* ─── Progress Bar ────────────────────────────────────────────────── */
+.progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #5c7cfa, #22d3ee);
+  transition: width 0.3s ease-out;
+}
+
+/* ─── Upload Dropzone ─────────────────────────────────────────────── */
+.dropzone-active {
+  border-color: #5c7cfa !important;
+  background: rgba(92, 124, 250, 0.05) !important;
+  box-shadow: 0 0 30px rgba(92, 124, 250, 0.15);
+}
+
+/* ─── Video Player ────────────────────────────────────────────────── */
+video {
+  border-radius: 12px;
+}
+
+/* ─── Tab Styles ──────────────────────────────────────────────────── */
+.tab-active {
+  color: #5c7cfa;
+  border-bottom: 2px solid #5c7cfa;
+  background: rgba(92, 124, 250, 0.05);
+}
+
+.tab-inactive {
+  color: #909296;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-inactive:hover {
+  color: #c1c2c5;
+  background: rgba(255, 255, 255, 0.02);
+}
