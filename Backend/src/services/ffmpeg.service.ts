@@ -108,20 +108,23 @@ export function renderReel(options: RenderOptions): Promise<string> {
     const outputFilename = `render_${renderId}.mp4`;
     const outputPath = path.join(rendersDir, outputFilename);
 
-    // Update status to processing
     updateRender(renderId, { status: 'processing', progress: 0 });
 
+    // Clean & robust filter matching EDITOR.js reference
     const filterComplex = [
-      // Scale and pad main video to 1080x1920 vertical
+      // 1. Main video → scale + pad + soft vignette
       '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,',
-      'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black[base];',
-      // Scale and chromakey the green-screen template
-      '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,',
       'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,',
-      'chromakey=0x00FF00:0.1:0.1[gs];',
-      // Overlay template on base
-      '[base][gs]overlay=0:0[outv]',
-    ].join('\n');
+      'vignette=PI/2.6:aspect=0.55[base];',
+
+      // 2. Template → scale, pad, setsar=1, THEN chromakey (exactly like EDITOR.js)
+      '[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,',
+      'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,',
+      'chromakey=0x00FF00:0.28:0.08[gs];',
+
+      // 3. Overlay
+      '[base][gs]overlay=0:0:format=auto[outv]'
+    ].join('');
 
     const args = [
       '-y',
@@ -129,7 +132,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
       '-i', templatePath,
       '-filter_complex', filterComplex,
       '-map', '[outv]',
-      '-map', '1:a?',
+      '-map', '1:a?',                 // template audio
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '23',
@@ -155,7 +158,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
       const output = data.toString();
       stderrData += output;
 
-      // Parse duration from FFmpeg output
+      // Duration
       const durationMatch = output.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
       if (durationMatch && totalDuration === 0) {
         const hours = parseInt(durationMatch[1]);
@@ -165,7 +168,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
         totalDuration = hours * 3600 + minutes * 60 + seconds + centiseconds / 100;
       }
 
-      // Parse progress from FFmpeg output
+      // Progress
       const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
       if (timeMatch && totalDuration > 0) {
         const hours = parseInt(timeMatch[1]);
@@ -174,7 +177,6 @@ export function renderReel(options: RenderOptions): Promise<string> {
         const centiseconds = parseInt(timeMatch[4]);
         const currentTime = hours * 3600 + minutes * 60 + seconds + centiseconds / 100;
         const progress = Math.min(Math.round((currentTime / totalDuration) * 100), 99);
-
         updateRender(renderId, { status: 'processing', progress });
       }
     });
@@ -190,7 +192,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
         });
         resolve(outputFilename);
       } else {
-        const errorMsg = `FFmpeg exited with code ${code}. ${stderrData.slice(-500)}`;
+        const errorMsg = `FFmpeg exited with code ${code}. ${stderrData.slice(-600)}`;
         console.error(`❌ Render failed: ${renderId}`, errorMsg);
         updateRender(renderId, {
           status: 'failed',
