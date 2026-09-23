@@ -100,6 +100,7 @@ router.post('/', async (req: Request, res: Response) => {
       renderId,
       videoPath,
       templatePath,
+      duration: template.duration,
     }).catch((err) => {
       console.error(`Render ${renderId} failed:`, err.message);
     });

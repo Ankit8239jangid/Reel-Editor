@@ -10,6 +10,7 @@ export interface RenderOptions {
   renderId: string;
   videoPath: string;
   templatePath: string;
+  duration: number;
 }
 
 /**
@@ -48,6 +49,34 @@ export function getVideoDuration(filePath: string): Promise<number> {
     ffprobe.on('error', () => {
       console.warn('ffprobe not found, skipping duration detection');
       resolve(0);
+    });
+  });
+}
+
+/**
+ * Check if video has an audio stream
+ */
+export function hasAudio(filePath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ffprobe = spawn('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'stream=codec_type',
+      '-of', 'csv=p=0',
+      '-select_streams', 'a',
+      filePath,
+    ]);
+
+    let output = '';
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    ffprobe.on('close', (code) => {
+      resolve(output.trim().includes('audio'));
+    });
+
+    ffprobe.on('error', () => {
+      resolve(false);
     });
   });
 }
@@ -97,8 +126,8 @@ export function generateThumbnail(videoPath: string, outputDir: string): Promise
  * This is the core FFmpeg pipeline from the PRD.
  */
 export function renderReel(options: RenderOptions): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const { renderId, videoPath, templatePath } = options;
+  return new Promise(async (resolve, reject) => {
+    const { renderId, videoPath, templatePath, duration } = options;
     const rendersDir = path.join(UPLOAD_DIR, 'renders');
 
     if (!fs.existsSync(rendersDir)) {
@@ -110,8 +139,11 @@ export function renderReel(options: RenderOptions): Promise<string> {
 
     updateRender(renderId, { status: 'processing', progress: 0 });
 
+    const mainHasAudio = await hasAudio(videoPath);
+    const templateHasAudio = await hasAudio(templatePath);
+
     // Clean & robust filter matching EDITOR.js reference
-    const filterComplex = [
+    const filterComplexArray = [
       // 1. Main video → scale + pad + soft vignette
       '[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,',
       'pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,',
@@ -123,11 +155,20 @@ export function renderReel(options: RenderOptions): Promise<string> {
       'chromakey=0x00FF00:0.28:0.08[gs];',
 
       // 3. Overlay
-      '[base][gs]overlay=0:0:format=auto[outv];',
+      '[base][gs]overlay=0:0:format=auto[outv]'
+    ];
 
-      // 4. Mix Audio
-      '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[aout]'
-    ].join('');
+    let audioMapArgs: string[] = [];
+    if (mainHasAudio && templateHasAudio) {
+      filterComplexArray.push(';', '[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=2:normalize=0[aout]');
+      audioMapArgs = ['-map', '[aout]'];
+    } else if (mainHasAudio) {
+      audioMapArgs = ['-map', '0:a'];
+    } else if (templateHasAudio) {
+      audioMapArgs = ['-map', '1:a'];
+    }
+
+    const filterComplex = filterComplexArray.join('');
 
     const args = [
       '-y',
@@ -135,7 +176,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
       '-i', templatePath,
       '-filter_complex', filterComplex,
       '-map', '[outv]',
-      '-map', '[aout]',
+      ...audioMapArgs,
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '23',
@@ -143,7 +184,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
       '-c:a', 'aac',
       '-b:a', '128k',
       '-movflags', '+faststart',
-      '-shortest',
+      '-t', String(duration),
       outputPath,
     ];
 
