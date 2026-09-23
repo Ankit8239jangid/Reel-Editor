@@ -123,7 +123,10 @@ export function renderReel(options: RenderOptions): Promise<string> {
       'chromakey=0x00FF00:0.28:0.08[gs];',
 
       // 3. Overlay
-      '[base][gs]overlay=0:0:format=auto[outv]'
+      '[base][gs]overlay=0:0:format=auto[outv];',
+
+      // 4. Mix Audio
+      '[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[aout]'
     ].join('');
 
     const args = [
@@ -132,7 +135,7 @@ export function renderReel(options: RenderOptions): Promise<string> {
       '-i', templatePath,
       '-filter_complex', filterComplex,
       '-map', '[outv]',
-      '-map', '1:a?',                 // template audio
+      '-map', '[aout]',
       '-c:v', 'libx264',
       '-preset', 'medium',
       '-crf', '23',
