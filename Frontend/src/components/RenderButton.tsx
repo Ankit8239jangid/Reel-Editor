@@ -6,19 +6,27 @@ interface RenderButtonProps {
   selectedVideo: Video | null;
   selectedTemplate: Template | null;
   onRenderComplete: () => void;
+  slideImages?: string[];
 }
 
 const RenderButton: React.FC<RenderButtonProps> = ({
   selectedVideo,
   selectedTemplate,
   onRenderComplete,
+  slideImages = [],
 }) => {
   const [render, setRender] = useState<Render | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const canRender = selectedVideo && selectedTemplate && !isRendering;
+  const expectedSlotCount = selectedTemplate?.mediaSlots?.length ?? selectedTemplate?.slideDurations?.length ?? 0;
+  const hasMediaSlots = expectedSlotCount > 0 && selectedTemplate?.isSlideTemplate;
+
+  const isSlideReady = hasMediaSlots && slideImages.length === expectedSlotCount;
+  const isVideoReady = !hasMediaSlots && selectedVideo !== null;
+  
+  const canRender = selectedTemplate && (isSlideReady || isVideoReady) && !isRendering;
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -53,14 +61,18 @@ const RenderButton: React.FC<RenderButtonProps> = ({
   };
 
   const handleRender = async () => {
-    if (!selectedVideo || !selectedTemplate) return;
+    if (!selectedTemplate || !canRender) return;
 
     setIsRendering(true);
     setError(null);
     setRender(null);
 
     try {
-      const renderJob = await startRenderApi(selectedVideo.id, selectedTemplate.id);
+      const renderJob = await startRenderApi(
+        selectedTemplate.id,
+        selectedVideo?.id,
+        hasMediaSlots ? slideImages : undefined
+      );
       setRender(renderJob);
       pollRenderStatus(renderJob.id);
     } catch (err: any) {

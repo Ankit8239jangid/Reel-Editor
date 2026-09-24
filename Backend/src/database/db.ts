@@ -1,165 +1,132 @@
-import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 import { Video, Template, Render } from '../types';
 
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'database.sqlite');
+const STORE_PATH = path.join(__dirname, '..', '..', 'data', 'store.json');
 
-let db: Database.Database;
+interface StoreData {
+  videos: Video[];
+  templates: Template[];
+  renders: Render[];
+}
+
+let store: StoreData = {
+  videos: [],
+  templates: [],
+  renders: []
+};
 
 export function initDatabase(): void {
-  const fs = require('fs');
-  const dataDir = path.dirname(DB_PATH);
+  const dataDir = path.dirname(STORE_PATH);
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS videos (
-      id TEXT PRIMARY KEY,
-      originalName TEXT NOT NULL,
-      filename TEXT NOT NULL,
-      duration REAL DEFAULT 0,
-      thumbnail TEXT,
-      createdAt TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS templates (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      filename TEXT NOT NULL,
-      duration REAL DEFAULT 0,
-      thumbnail TEXT,
-      createdAt TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS renders (
-      id TEXT PRIMARY KEY,
-      videoId TEXT NOT NULL,
-      templateId TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
-      progress REAL DEFAULT 0,
-      outputFilename TEXT,
-      error TEXT,
-      createdAt TEXT NOT NULL,
-      completedAt TEXT,
-      FOREIGN KEY (videoId) REFERENCES videos(id) ON DELETE CASCADE,
-      FOREIGN KEY (templateId) REFERENCES templates(id) ON DELETE CASCADE
-    );
-  `);
-
-  console.log('📦 Database initialized successfully');
+  if (fs.existsSync(STORE_PATH)) {
+    try {
+      const data = fs.readFileSync(STORE_PATH, 'utf-8');
+      store = JSON.parse(data);
+      console.log('📦 In-memory database loaded from store.json');
+    } catch (err) {
+      console.error('Failed to parse store.json. Initializing empty store.', err);
+    }
+  } else {
+    saveStore();
+    console.log('📦 Created new in-memory database at store.json');
+  }
 }
 
-export function getDb(): Database.Database {
-  if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() first.');
+function saveStore(): void {
+  try {
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+  } catch (err) {
+    console.error('Failed to save store.json', err);
   }
-  return db;
 }
 
 // ─── Video CRUD ──────────────────────────────────────────────────────────────
 
 export function createVideo(video: Video): Video {
-  const stmt = getDb().prepare(`
-    INSERT INTO videos (id, originalName, filename, duration, thumbnail, createdAt)
-    VALUES (@id, @originalName, @filename, @duration, @thumbnail, @createdAt)
-  `);
-  stmt.run(video);
+  store.videos.unshift(video);
+  saveStore();
   return video;
 }
 
 export function getAllVideos(): Video[] {
-  return getDb().prepare('SELECT * FROM videos ORDER BY createdAt DESC').all() as Video[];
+  return [...store.videos].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getVideoById(id: string): Video | undefined {
-  return getDb().prepare('SELECT * FROM videos WHERE id = ?').get(id) as Video | undefined;
+  return store.videos.find(v => v.id === id);
 }
 
 export function deleteVideo(id: string): boolean {
-  const result = getDb().prepare('DELETE FROM videos WHERE id = ?').run(id);
-  return result.changes > 0;
+  const initialLength = store.videos.length;
+  store.videos = store.videos.filter(v => v.id !== id);
+  if (store.videos.length < initialLength) {
+    saveStore();
+    return true;
+  }
+  return false;
 }
 
 // ─── Template CRUD ───────────────────────────────────────────────────────────
 
 export function createTemplate(template: Template): Template {
-  const stmt = getDb().prepare(`
-    INSERT INTO templates (id, name, filename, duration, thumbnail, createdAt)
-    VALUES (@id, @name, @filename, @duration, @thumbnail, @createdAt)
-  `);
-  stmt.run(template);
+  store.templates.unshift(template);
+  saveStore();
   return template;
 }
 
 export function getAllTemplates(): Template[] {
-  return getDb().prepare('SELECT * FROM templates ORDER BY createdAt DESC').all() as Template[];
+  return [...store.templates].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getTemplateById(id: string): Template | undefined {
-  return getDb().prepare('SELECT * FROM templates WHERE id = ?').get(id) as Template | undefined;
+  return store.templates.find(t => t.id === id);
 }
 
 export function deleteTemplate(id: string): boolean {
-  const result = getDb().prepare('DELETE FROM templates WHERE id = ?').run(id);
-  return result.changes > 0;
+  const initialLength = store.templates.length;
+  store.templates = store.templates.filter(t => t.id !== id);
+  if (store.templates.length < initialLength) {
+    saveStore();
+    return true;
+  }
+  return false;
 }
 
 // ─── Render CRUD ─────────────────────────────────────────────────────────────
 
 export function createRender(render: Render): Render {
-  const stmt = getDb().prepare(`
-    INSERT INTO renders (id, videoId, templateId, status, progress, outputFilename, error, createdAt, completedAt)
-    VALUES (@id, @videoId, @templateId, @status, @progress, @outputFilename, @error, @createdAt, @completedAt)
-  `);
-  stmt.run({
-    ...render,
-    progress: render.progress ?? 0,
-    outputFilename: render.outputFilename ?? null,
-    error: render.error ?? null,
-    completedAt: render.completedAt ?? null,
-  });
+  store.renders.unshift(render);
+  saveStore();
   return render;
 }
 
 export function getAllRenders(): Render[] {
-  return getDb().prepare('SELECT * FROM renders ORDER BY createdAt DESC').all() as Render[];
+  return [...store.renders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getRenderById(id: string): Render | undefined {
-  return getDb().prepare('SELECT * FROM renders WHERE id = ?').get(id) as Render | undefined;
+  return store.renders.find(r => r.id === id);
 }
 
 export function updateRender(id: string, updates: Partial<Render>): boolean {
-  const current = getRenderById(id);
-  if (!current) return false;
+  const index = store.renders.findIndex(r => r.id === id);
+  if (index === -1) return false;
 
-  const merged = { ...current, ...updates };
-  const stmt = getDb().prepare(`
-    UPDATE renders
-    SET status = @status,
-        progress = @progress,
-        outputFilename = @outputFilename,
-        error = @error,
-        completedAt = @completedAt
-    WHERE id = @id
-  `);
-  const result = stmt.run({
-    id,
-    status: merged.status,
-    progress: merged.progress ?? 0,
-    outputFilename: merged.outputFilename ?? null,
-    error: merged.error ?? null,
-    completedAt: merged.completedAt ?? null,
-  });
-  return result.changes > 0;
+  store.renders[index] = { ...store.renders[index], ...updates };
+  saveStore();
+  return true;
 }
 
 export function deleteRender(id: string): boolean {
-  const result = getDb().prepare('DELETE FROM renders WHERE id = ?').run(id);
-  return result.changes > 0;
+  const initialLength = store.renders.length;
+  store.renders = store.renders.filter(r => r.id !== id);
+  if (store.renders.length < initialLength) {
+    saveStore();
+    return true;
+  }
+  return false;
 }

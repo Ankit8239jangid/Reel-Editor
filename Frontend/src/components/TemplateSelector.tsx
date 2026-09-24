@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useState } from 'react';
 import { Template } from '../types';
-import { uploadTemplate as uploadTemplateApi, deleteTemplate as deleteTemplateApi } from '../api/client';
+import { deleteTemplate as deleteTemplateApi } from '../api/client';
+import TemplateUploadModal from './TemplateUploadModal';
 
 interface TemplateSelectorProps {
   templates: Template[];
@@ -16,51 +16,9 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   onSelectTemplate,
   onTemplatesChange,
 }) => {
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [templateName, setTemplateName] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
-
-      const file = acceptedFiles[0];
-      setUploading(true);
-      setUploadProgress(0);
-      setError(null);
-
-      try {
-        await uploadTemplateApi(
-          file,
-          templateName || undefined,
-          (p) => setUploadProgress(p)
-        );
-        onTemplatesChange();
-        setShowUpload(false);
-        setTemplateName('');
-      } catch (err: any) {
-        setError(err.response?.data?.error || err.message || 'Upload failed');
-      } finally {
-        setUploading(false);
-      }
-    },
-    [templateName, onTemplatesChange]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'video/mp4': ['.mp4'],
-      'video/quicktime': ['.mov'],
-      'video/webm': ['.webm'],
-    },
-    maxSize: 500 * 1024 * 1024,
-    multiple: false,
-    disabled: uploading,
-  });
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -93,7 +51,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           <span className="ml-2 text-sm text-dark-200 font-normal">({templates.length})</span>
         </h3>
         <button
-          onClick={() => setShowUpload(!showUpload)}
+          onClick={() => setShowUploadModal(true)}
           className="btn-secondary text-sm flex items-center space-x-1.5"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -103,53 +61,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
         </button>
       </div>
 
-      {/* Upload Modal */}
-      {showUpload && (
-        <div className="glass-card-sm p-4 space-y-3 animate-slide-up">
-          <input
-            type="text"
-            placeholder="Template name (optional)"
-            value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
-            className="input-field text-sm"
-          />
-          <div
-            {...getRootProps()}
-            className={`
-              border-2 border-dashed rounded-xl p-6 text-center cursor-pointer
-              transition-all duration-200
-              ${isDragActive
-                ? 'border-primary-500 bg-primary-500/5'
-                : 'border-dark-400 hover:border-dark-300'
-              }
-            `}
-          >
-            <input {...getInputProps()} />
-            <svg className="w-8 h-8 text-dark-200 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            <p className="text-dark-200 text-sm">
-              Drop green-screen template or <span className="text-primary-400">browse</span>
-            </p>
-          </div>
-
-          {uploading && (
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-dark-200">Uploading...</span>
-                <span className="text-primary-400">{uploadProgress}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-bar-fill" style={{ width: `${uploadProgress}%` }} />
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <p className="text-red-400 text-xs">{error}</p>
-          )}
-        </div>
-      )}
+      {error && <p className="text-red-400 text-xs">{error}</p>}
 
       {/* Template Grid */}
       <div className="overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
@@ -221,6 +133,13 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                   <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-dark-900/80 backdrop-blur-sm text-[10px] font-medium text-white">
                     {formatDuration(template.duration)}
                   </div>
+
+                  {/* Slots badge */}
+                  {(template.mediaSlots && template.mediaSlots.length > 0) && (
+                    <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded-md bg-primary-500/80 backdrop-blur-sm text-[10px] font-bold text-white">
+                      {template.mediaSlots.length} slots
+                    </div>
+                  )}
                 </div>
 
                 {/* Info */}
@@ -236,6 +155,14 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <TemplateUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onUploaded={onTemplatesChange}
+        />
+      )}
     </div>
   );
 };

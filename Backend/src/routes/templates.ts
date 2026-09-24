@@ -45,6 +45,61 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
     const thumbnailDir = path.join(UPLOAD_DIR, 'templates');
     const thumbnail = await generateThumbnail(filePath, thumbnailDir);
 
+    // Parse media slots (new system)
+    let mediaSlots: any[] | undefined = undefined;
+    let isSlideTemplate = false;
+    let slideDurations: number[] | undefined = undefined;
+
+    if (req.body.mediaSlots) {
+      try {
+        mediaSlots = JSON.parse(req.body.mediaSlots);
+      } catch (e) {
+        return res.status(400).json({ success: false, error: 'Invalid mediaSlots JSON' });
+      }
+
+      // Validate slots
+      if (!Array.isArray(mediaSlots) || mediaSlots.length === 0) {
+        return res.status(400).json({ success: false, error: 'mediaSlots must be a non-empty array' });
+      }
+
+      for (const slot of mediaSlots) {
+        if (slot.startTime < 0) {
+          return res.status(400).json({ success: false, error: `Slot "${slot.slotId}": startTime cannot be negative` });
+        }
+        if (slot.endTime <= slot.startTime) {
+          return res.status(400).json({ success: false, error: `Slot "${slot.slotId}": endTime must be after startTime` });
+        }
+        if (slot.duration <= 0) {
+          return res.status(400).json({ success: false, error: `Slot "${slot.slotId}": duration must be positive` });
+        }
+        if (!['image', 'video', 'image_or_video'].includes(slot.mediaType)) {
+          return res.status(400).json({ success: false, error: `Slot "${slot.slotId}": invalid mediaType "${slot.mediaType}"` });
+        }
+      }
+
+      // Check for overlapping slots
+      const sorted = [...mediaSlots].sort((a, b) => a.startTime - b.startTime);
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].startTime < sorted[i - 1].endTime) {
+          return res.status(400).json({ success: false, error: `Slots "${sorted[i - 1].slotId}" and "${sorted[i].slotId}" overlap` });
+        }
+      }
+
+      // Derive legacy fields for backward compat
+      isSlideTemplate = true;
+      slideDurations = mediaSlots.sort((a, b) => a.order - b.order).map(s => s.duration);
+    } else {
+      // Legacy: check old-style isSlideTemplate/slideDurations
+      isSlideTemplate = req.body.isSlideTemplate === 'true';
+      if (isSlideTemplate && req.body.slideDurations) {
+        try {
+          slideDurations = JSON.parse(req.body.slideDurations);
+        } catch (e) {
+          console.warn('Failed to parse slideDurations', e);
+        }
+      }
+    }
+
     const template: Template = {
       id: uuidv4(),
       name: req.body.name || path.parse(req.file.originalname).name,
@@ -52,6 +107,9 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
       duration,
       thumbnail: thumbnail || undefined,
       createdAt: new Date().toISOString(),
+      isSlideTemplate,
+      slideDurations,
+      mediaSlots,
     };
 
     createTemplate(template);

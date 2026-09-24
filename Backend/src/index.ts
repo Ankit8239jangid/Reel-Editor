@@ -11,6 +11,7 @@ import { initDatabase } from './database/db';
 import videosRouter from './routes/videos';
 import templatesRouter from './routes/templates';
 import rendersRouter from './routes/renders';
+import imagesRouter from './routes/images';
 
 const app: Application = express();
 const PORT = parseInt(process.env.PORT || '4000', 10);
@@ -21,6 +22,7 @@ const dirs = [
   path.join(UPLOAD_DIR, 'videos'),
   path.join(UPLOAD_DIR, 'templates'),
   path.join(UPLOAD_DIR, 'renders'),
+  path.join(UPLOAD_DIR, 'images'),
 ];
 
 dirs.forEach((dir) => {
@@ -46,6 +48,7 @@ app.use('/uploads', express.static(path.resolve(UPLOAD_DIR)));
 app.use('/api/videos', videosRouter);
 app.use('/api/templates', templatesRouter);
 app.use('/api/renders', rendersRouter);
+app.use('/api/images', imagesRouter);
 
 // ─── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

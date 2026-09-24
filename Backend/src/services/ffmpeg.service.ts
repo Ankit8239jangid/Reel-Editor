@@ -11,6 +11,9 @@ export interface RenderOptions {
   videoPath: string;
   templatePath: string;
   duration: number;
+  isSlideTemplate?: boolean;
+  slideImages?: string[];
+  slideDurations?: number[];
 }
 
 /**
@@ -122,12 +125,204 @@ export function generateThumbnail(videoPath: string, outputDir: string): Promise
 }
 
 /**
+ * Merge multiple images into a single video
+ */
+/**
+ * Create a video from multiple images with predefined durations.
+ *
+ * IMPORTANT:
+ * Do not use `-loop 1`.
+ * Some FFmpeg builds reject `-loop` for image inputs.
+ *
+ * Each image is converted into its own fixed-duration video,
+ * then all generated clips are concatenated.
+ */
+export function createSlideBaseVideo(
+  images: string[],
+  durations: number[],
+  outputPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!images.length) {
+      return reject(
+        new Error('No slide images provided')
+      );
+    }
+
+    if (images.length !== durations.length) {
+      return reject(
+        new Error(
+          `Images count (${images.length}) does not match durations count (${durations.length})`
+        )
+      );
+    }
+
+    const args: string[] = ['-y'];
+
+    // ---------------------------------------------------------
+    // Add every image as a normal input
+    // ---------------------------------------------------------
+
+    images.forEach((img) => {
+      args.push(
+        '-i',
+        img
+      );
+    });
+
+    // ---------------------------------------------------------
+    // Build video filters
+    // ---------------------------------------------------------
+
+    const filterComplex: string[] = [];
+
+    let concatInputs = '';
+
+    images.forEach((_, index) => {
+      const duration =
+        Number(durations[index]) || 3;
+
+      if (duration <= 0) {
+        throw new Error(
+          `Invalid duration for slide ${index + 1}: ${duration}`
+        );
+      }
+
+      filterComplex.push(
+        `[${index}:v]` +
+        `scale=1080:1920:force_original_aspect_ratio=decrease,` +
+        `pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,` +
+        `setsar=1,` +
+        `fps=30,` +
+        `tpad=stop_mode=clone:stop_duration=${duration}` +
+        `[slide${index}];`
+      );
+
+      concatInputs += `[slide${index}]`;
+    });
+
+    // ---------------------------------------------------------
+    // Concatenate slides
+    // ---------------------------------------------------------
+
+    filterComplex.push(
+      `${concatInputs}` +
+      `concat=n=${images.length}:v=1:a=0[outv]`
+    );
+
+    args.push(
+      '-filter_complex',
+      filterComplex.join('')
+    );
+
+    args.push(
+      '-map',
+      '[outv]',
+
+      '-c:v',
+      'libx264',
+
+      '-preset',
+      'fast',
+
+      '-crf',
+      '23',
+
+      '-pix_fmt',
+      'yuv420p',
+
+      '-r',
+      '30',
+
+      '-an',
+
+      '-movflags',
+      '+faststart',
+
+      outputPath
+    );
+
+    console.log(
+      '🎞 Creating slide base video...'
+    );
+
+    console.log(
+      '   Images:',
+      images.length
+    );
+
+    console.log(
+      '   Durations:',
+      durations
+    );
+
+    const ffmpeg = spawn(
+      'ffmpeg',
+      args
+    );
+
+    let errorOutput = '';
+
+    ffmpeg.stderr.on(
+      'data',
+      (data) => {
+        const output =
+          data.toString();
+
+        errorOutput += output;
+
+        console.log(
+          output
+        );
+      }
+    );
+
+    ffmpeg.on(
+      'close',
+      (code) => {
+
+        if (
+          code === 0 &&
+          fs.existsSync(outputPath)
+        ) {
+
+          console.log(
+            `✅ Slide video created: ${outputPath}`
+          );
+
+          resolve();
+
+        } else {
+
+          reject(
+            new Error(
+              `Failed to create slide video. FFmpeg exited with code ${code}.\n${errorOutput.slice(-3000)}`
+            )
+          );
+        }
+      }
+    );
+
+    ffmpeg.on(
+      'error',
+      (error) => {
+
+        reject(
+          new Error(
+            `FFmpeg process error: ${error.message}`
+          )
+        );
+      }
+    );
+  });
+}
+/**
  * Render the final reel by chromakeying the template onto the main video.
  * This is the core FFmpeg pipeline from the PRD.
  */
 export function renderReel(options: RenderOptions): Promise<string> {
   return new Promise(async (resolve, reject) => {
-    const { renderId, videoPath, templatePath, duration } = options;
+    let { renderId, videoPath, templatePath, duration, isSlideTemplate, slideImages, slideDurations } = options;
     const rendersDir = path.join(UPLOAD_DIR, 'renders');
 
     if (!fs.existsSync(rendersDir)) {
@@ -136,8 +331,21 @@ export function renderReel(options: RenderOptions): Promise<string> {
 
     const outputFilename = `render_${renderId}.mp4`;
     const outputPath = path.join(rendersDir, outputFilename);
+    let tempVideoPath = '';
 
     updateRender(renderId, { status: 'processing', progress: 0 });
+
+    try {
+      if (isSlideTemplate && slideImages && slideDurations) {
+        tempVideoPath = path.join(rendersDir, `temp_slides_${renderId}.mp4`);
+        const fullImagePaths = slideImages.map(img => path.join(UPLOAD_DIR, 'images', img));
+        await createSlideBaseVideo(fullImagePaths, slideDurations, tempVideoPath);
+        videoPath = tempVideoPath;
+      }
+    } catch (err: any) {
+      updateRender(renderId, { status: 'failed', error: err.message });
+      return reject(err);
+    }
 
     const mainHasAudio = await hasAudio(videoPath);
     const templateHasAudio = await hasAudio(templatePath);
@@ -226,6 +434,9 @@ export function renderReel(options: RenderOptions): Promise<string> {
     });
 
     ffmpeg.on('close', (code) => {
+      if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+        try { fs.unlinkSync(tempVideoPath); } catch (e) {}
+      }
       if (code === 0 && fs.existsSync(outputPath)) {
         console.log(`✅ Render completed: ${renderId}`);
         updateRender(renderId, {
@@ -248,6 +459,9 @@ export function renderReel(options: RenderOptions): Promise<string> {
     });
 
     ffmpeg.on('error', (err) => {
+      if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+        try { fs.unlinkSync(tempVideoPath); } catch (e) {}
+      }
       const errorMsg = `FFmpeg process error: ${err.message}`;
       console.error(`❌ Render error: ${renderId}`, errorMsg);
       updateRender(renderId, {

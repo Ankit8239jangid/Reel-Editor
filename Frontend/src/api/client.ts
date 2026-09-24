@@ -57,11 +57,15 @@ export async function getTemplate(id: string): Promise<Template> {
 export async function uploadTemplate(
   file: File,
   name?: string,
+  mediaSlots?: any[],
   onProgress?: (progress: number) => void
 ): Promise<Template> {
   const formData = new FormData();
   formData.append('template', file);
   if (name) formData.append('name', name);
+  if (mediaSlots && mediaSlots.length > 0) {
+    formData.append('mediaSlots', JSON.stringify(mediaSlots));
+  }
 
   const { data } = await api.post<ApiResponse<Template>>('/templates', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -92,9 +96,22 @@ export async function getRender(id: string): Promise<Render> {
   return data.data!;
 }
 
-export async function startRender(videoId: string, templateId: string): Promise<Render> {
-  const { data } = await api.post<ApiResponse<Render>>('/renders', { videoId, templateId });
+export async function startRender(
+  templateId: string,
+  videoId?: string,
+  slideImages?: string[]
+): Promise<Render> {
+  const { data } = await api.post<ApiResponse<Render>>('/renders', { templateId, videoId, slideImages });
   return data.data!;
+}
+
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const { data } = await api.post<ApiResponse<{filename: string}>>('/images', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data.data!.filename;
 }
 
 export async function deleteRender(id: string): Promise<void> {

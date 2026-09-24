@@ -58,19 +58,13 @@ router.get('/:id', (req: Request, res: Response) => {
 // POST /api/renders — Start a new render
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { videoId, templateId } = req.body as RenderRequest;
+    const { videoId, templateId, slideImages } = req.body as RenderRequest;
 
-    if (!videoId || !templateId) {
+    if (!templateId) {
       return res.status(400).json({
         success: false,
-        error: 'Both videoId and templateId are required',
+        error: 'templateId is required',
       });
-    }
-
-    // Validate video exists
-    const video = getVideoById(videoId);
-    if (!video) {
-      return res.status(404).json({ success: false, error: 'Video not found' });
     }
 
     // Validate template exists
@@ -79,13 +73,34 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
 
+    let videoPath = '';
+
+    // Determine expected slot count from mediaSlots or legacy slideDurations
+    const expectedSlotCount = template.mediaSlots?.length ?? template.slideDurations?.length ?? 0;
+    
+    if (template.isSlideTemplate && expectedSlotCount > 0) {
+      if (!slideImages || slideImages.length !== expectedSlotCount) {
+        return res.status(400).json({ success: false, error: `Exactly ${expectedSlotCount} media files are required for this template.` });
+      }
+    } else {
+      if (!videoId) {
+        return res.status(400).json({ success: false, error: 'videoId is required for this template.' });
+      }
+      const video = getVideoById(videoId);
+      if (!video) {
+        return res.status(404).json({ success: false, error: 'Video not found' });
+      }
+      videoPath = path.join(UPLOAD_DIR, 'videos', video.filename);
+    }
+
     const renderId = uuidv4();
     const render: Render = {
       id: renderId,
-      videoId,
+      videoId: videoId || '',
       templateId,
       status: 'pending',
       progress: 0,
+      slideImages,
       createdAt: new Date().toISOString(),
     };
 
@@ -93,14 +108,21 @@ router.post('/', async (req: Request, res: Response) => {
     console.log(`🚀 Render job created: ${renderId}`);
 
     // Start render asynchronously
-    const videoPath = path.join(UPLOAD_DIR, 'videos', video.filename);
     const templatePath = path.join(UPLOAD_DIR, 'templates', template.filename);
+
+    // Use mediaSlots durations if available, else fall back to legacy slideDurations
+    const effectiveSlideDurations = template.mediaSlots
+      ? template.mediaSlots.sort((a, b) => a.order - b.order).map(s => s.duration)
+      : template.slideDurations;
 
     renderReel({
       renderId,
       videoPath,
       templatePath,
       duration: template.duration,
+      isSlideTemplate: template.isSlideTemplate,
+      slideImages,
+      slideDurations: effectiveSlideDurations,
     }).catch((err) => {
       console.error(`Render ${renderId} failed:`, err.message);
     });

@@ -7,6 +7,15 @@ export interface Video {
   createdAt: string;
 }
 
+export interface MediaSlot {
+  slotId: string;
+  order: number;
+  mediaType: 'image' | 'video' | 'image_or_video';
+  startTime: number;
+  endTime: number;
+  duration: number;
+}
+
 export interface Template {
   id: string;
   name: string;
@@ -14,6 +23,11 @@ export interface Template {
   duration: number;
   thumbnail?: string;
   createdAt: string;
+  // Legacy fields (backward compat)
+  isSlideTemplate?: boolean;
+  slideDurations?: number[];
+  // New media slots system
+  mediaSlots?: MediaSlot[];
 }
 
 export interface Render {
@@ -26,11 +40,13 @@ export interface Render {
   error?: string;
   createdAt: string;
   completedAt?: string;
+  slideImages?: string[];
 }
 
 export interface RenderRequest {
-  videoId: string;
   templateId: string;
+  videoId?: string;
+  slideImages?: string[];
 }
 
 export interface ApiResponse<T> {
