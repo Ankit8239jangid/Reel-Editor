@@ -80,6 +80,11 @@ export async function uploadTemplate(
   return data.data!;
 }
 
+export async function updateTemplate(id: string, updates: Partial<Template>): Promise<Template> {
+  const { data } = await api.put<ApiResponse<Template>>(`/templates/${id}`, updates);
+  return data.data!;
+}
+
 export async function deleteTemplate(id: string): Promise<void> {
   await api.delete(`/templates/${id}`);
 }

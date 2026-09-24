@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { uploadTemplate } from '../middleware/upload';
-import { createTemplate, getAllTemplates, getTemplateById, deleteTemplate } from '../database/db';
+import { createTemplate, getAllTemplates, getTemplateById, deleteTemplate, updateTemplate } from '../database/db';
 import { getVideoDuration, generateThumbnail } from '../services/ffmpeg.service';
 import { Template } from '../types';
 
@@ -40,10 +40,24 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
       return res.status(400).json({ success: false, error: 'No template file uploaded' });
     }
 
-    const filePath = req.file.path;
-    const duration = await getVideoDuration(filePath);
-    const thumbnailDir = path.join(UPLOAD_DIR, 'templates');
-    const thumbnail = await generateThumbnail(filePath, thumbnailDir);
+    const templateId = uuidv4();
+    const templateDir = path.join(UPLOAD_DIR, 'templates', templateId);
+    
+    // Create the dedicated folder
+    if (!fs.existsSync(templateDir)) {
+      fs.mkdirSync(templateDir, { recursive: true });
+    }
+
+    // Move the uploaded file into the new folder
+    const ext = path.extname(req.file.originalname);
+    const newFileName = `template${ext}`;
+    const newFilePath = path.join(templateDir, newFileName);
+    fs.renameSync(req.file.path, newFilePath);
+
+    const duration = await getVideoDuration(newFilePath);
+    
+    // Generate thumbnail inside the folder
+    const thumbnail = await generateThumbnail(newFilePath, templateDir);
 
     // Parse media slots (new system)
     let mediaSlots: any[] | undefined = undefined;
@@ -101,11 +115,11 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
     }
 
     const template: Template = {
-      id: uuidv4(),
+      id: templateId,
       name: req.body.name || path.parse(req.file.originalname).name,
-      filename: req.file.filename,
+      filename: `${templateId}/${newFileName}`,
       duration,
-      thumbnail: thumbnail || undefined,
+      thumbnail: thumbnail ? `${templateId}/${thumbnail}` : undefined,
       createdAt: new Date().toISOString(),
       isSlideTemplate,
       slideDurations,
@@ -120,6 +134,27 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
   }
 });
 
+// PUT /api/templates/:id — Update template (e.g. slots)
+router.put('/:id', (req: Request, res: Response) => {
+  try {
+    const template = getTemplateById(req.params.id as string);
+    if (!template) {
+      return res.status(404).json({ success: false, error: 'Template not found' });
+    }
+
+    const updates: Partial<Template> = {};
+    if (req.body.name !== undefined) updates.name = req.body.name;
+    if (req.body.isSlideTemplate !== undefined) updates.isSlideTemplate = req.body.isSlideTemplate;
+    if (req.body.slideDurations !== undefined) updates.slideDurations = req.body.slideDurations;
+    if (req.body.mediaSlots !== undefined) updates.mediaSlots = req.body.mediaSlots;
+
+    updateTemplate(template.id, updates);
+    res.json({ success: true, data: { ...template, ...updates } });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // DELETE /api/templates/:id — Delete template
 router.delete('/:id', (req: Request, res: Response) => {
   try {
@@ -128,18 +163,10 @@ router.delete('/:id', (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Template not found' });
     }
 
-    // Delete the file
-    const filePath = path.join(UPLOAD_DIR, 'templates', template.filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    // Delete thumbnail
-    if (template.thumbnail) {
-      const thumbPath = path.join(UPLOAD_DIR, 'templates', template.thumbnail);
-      if (fs.existsSync(thumbPath)) {
-        fs.unlinkSync(thumbPath);
-      }
+    // Delete the entire folder
+    const templateDir = path.join(UPLOAD_DIR, 'templates', template.id);
+    if (fs.existsSync(templateDir)) {
+      fs.rmSync(templateDir, { recursive: true, force: true });
     }
 
     deleteTemplate(template.id);

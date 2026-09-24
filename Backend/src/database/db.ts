@@ -25,7 +25,9 @@ export function initDatabase(): void {
   if (fs.existsSync(STORE_PATH)) {
     try {
       const data = fs.readFileSync(STORE_PATH, 'utf-8');
-      store = JSON.parse(data);
+      const parsed = JSON.parse(data);
+      store.videos = parsed.videos || [];
+      store.renders = parsed.renders || [];
       console.log('📦 In-memory database loaded from store.json');
     } catch (err) {
       console.error('Failed to parse store.json. Initializing empty store.', err);
@@ -34,11 +36,29 @@ export function initDatabase(): void {
     saveStore();
     console.log('📦 Created new in-memory database at store.json');
   }
+
+  // Load templates from their individual directories
+  const templatesDir = path.join(__dirname, '..', '..', 'uploads', 'templates');
+  if (fs.existsSync(templatesDir)) {
+    const folders = fs.readdirSync(templatesDir);
+    for (const folder of folders) {
+      const templateJsonPath = path.join(templatesDir, folder, 'template.json');
+      if (fs.existsSync(templateJsonPath)) {
+        try {
+          const data = fs.readFileSync(templateJsonPath, 'utf-8');
+          store.templates.push(JSON.parse(data));
+        } catch (e) {
+          console.error(`Failed to parse template.json in ${folder}`, e);
+        }
+      }
+    }
+  }
 }
 
 function saveStore(): void {
   try {
-    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
+    // Only save videos and renders to store.json. Templates are saved individually.
+    fs.writeFileSync(STORE_PATH, JSON.stringify({ videos: store.videos, renders: store.renders }, null, 2));
   } catch (err) {
     console.error('Failed to save store.json', err);
   }
@@ -74,7 +94,14 @@ export function deleteVideo(id: string): boolean {
 
 export function createTemplate(template: Template): Template {
   store.templates.unshift(template);
-  saveStore();
+  
+  // Save to its own folder
+  const templateDir = path.join(__dirname, '..', '..', 'uploads', 'templates', template.id);
+  if (!fs.existsSync(templateDir)) {
+    fs.mkdirSync(templateDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(templateDir, 'template.json'), JSON.stringify(template, null, 2));
+  
   return template;
 }
 
@@ -86,11 +113,29 @@ export function getTemplateById(id: string): Template | undefined {
   return store.templates.find(t => t.id === id);
 }
 
+export function updateTemplate(id: string, updates: Partial<Template>): boolean {
+  const index = store.templates.findIndex(t => t.id === id);
+  if (index === -1) return false;
+
+  const updatedTemplate = { ...store.templates[index], ...updates };
+  store.templates[index] = updatedTemplate;
+  
+  // Save to its own folder
+  const templateDir = path.join(__dirname, '..', '..', 'uploads', 'templates', id);
+  if (fs.existsSync(templateDir)) {
+    fs.writeFileSync(path.join(templateDir, 'template.json'), JSON.stringify(updatedTemplate, null, 2));
+  }
+  
+  return true;
+}
+
 export function deleteTemplate(id: string): boolean {
   const initialLength = store.templates.length;
   store.templates = store.templates.filter(t => t.id !== id);
+  
   if (store.templates.length < initialLength) {
-    saveStore();
+    // Note: The actual folder deletion is handled in routes/templates.ts
+    // We just remove it from memory here.
     return true;
   }
   return false;

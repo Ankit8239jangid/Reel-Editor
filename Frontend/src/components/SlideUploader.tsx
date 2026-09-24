@@ -95,7 +95,11 @@ const SlideUploader: React.FC<SlideUploaderProps> = ({ mediaSlots, slideImages, 
                 
                 {currentImage ? (
                   <>
-                    <img src={`/uploads/images/${currentImage}`} className="w-full h-full object-cover" alt={`Slot ${slot.order}`} />
+                    {/\.(mp4|mov|webm|avi)$/i.test(currentImage) ? (
+                      <video src={`/uploads/images/${currentImage}`} className="w-full h-full object-cover" muted loop playsInline autoPlay />
+                    ) : (
+                      <img src={`/uploads/images/${currentImage}`} className="w-full h-full object-cover" alt={`Slot ${slot.order}`} />
+                    )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
                       <span className="text-white text-xs font-semibold">Replace</span>
                     </div>

@@ -115,6 +115,10 @@ router.post('/', async (req: Request, res: Response) => {
       ? template.mediaSlots.sort((a, b) => a.order - b.order).map(s => s.duration)
       : template.slideDurations;
 
+    const effectiveSlideMutes = template.mediaSlots
+      ? template.mediaSlots.sort((a, b) => a.order - b.order).map(s => s.muted ?? false)
+      : undefined;
+
     renderReel({
       renderId,
       videoPath,
@@ -123,6 +127,7 @@ router.post('/', async (req: Request, res: Response) => {
       isSlideTemplate: template.isSlideTemplate,
       slideImages,
       slideDurations: effectiveSlideDurations,
+      slideMutes: effectiveSlideMutes,
     }).catch((err) => {
       console.error(`Render ${renderId} failed:`, err.message);
     });

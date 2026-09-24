@@ -2,6 +2,7 @@ node_modules
 dist
 .env
 uploads/
+data/
 database.sqlite
 .DS_Store
 npm-debug.log*

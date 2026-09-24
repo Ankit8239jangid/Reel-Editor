@@ -14,6 +14,7 @@ export interface MediaSlot {
   startTime: number;
   endTime: number;
   duration: number;
+  muted?: boolean;
 }
 
 export interface Template {

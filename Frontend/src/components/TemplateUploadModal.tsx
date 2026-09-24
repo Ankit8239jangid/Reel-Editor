@@ -1,12 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useDropzone } from 'react-dropzone';
-import { MediaSlot } from '../types';
-import { uploadTemplate as uploadTemplateApi } from '../api/client';
+import { MediaSlot, Template } from '../types';
+import { uploadTemplate as uploadTemplateApi, updateTemplate } from '../api/client';
 
 interface TemplateUploadModalProps {
   onClose: () => void;
   onUploaded: () => void;
+  initialTemplate?: Template;
+  mode?: 'upload' | 'edit';
 }
 
 let slotCounter = 0;
@@ -15,14 +17,14 @@ function nextSlotId(): string {
   return `slot-${slotCounter}`;
 }
 
-const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUploaded }) => {
-  const [templateName, setTemplateName] = useState('');
-  const [mediaSlots, setMediaSlots] = useState<MediaSlot[]>([]);
+const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUploaded, initialTemplate, mode = 'upload' }) => {
+  const [templateName, setTemplateName] = useState(initialTemplate?.name || '');
+  const [mediaSlots, setMediaSlots] = useState<MediaSlot[]>(initialTemplate?.mediaSlots || []);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [step, setStep] = useState<'file' | 'slots'>('file');
+  const [step, setStep] = useState<'file' | 'slots'>(mode === 'edit' ? 'slots' : 'file');
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -65,7 +67,7 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
     setMediaSlots(newSlots);
   };
 
-  const updateSlot = (idx: number, field: string, value: number | string) => {
+  const updateSlot = (idx: number, field: string, value: number | string | boolean) => {
     const newSlots = [...mediaSlots];
     const slot = { ...newSlots[idx] };
 
@@ -83,6 +85,8 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
       const v = Math.max(slot.startTime + 0.1, Number(value));
       slot.endTime = v;
       slot.duration = +(v - slot.startTime).toFixed(2);
+    } else if (field === 'muted') {
+      slot.muted = value as boolean;
     }
 
     newSlots[idx] = slot;
@@ -126,7 +130,7 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
     : 0;
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (mode === 'upload' && !selectedFile) return;
 
     const validationErrors = getValidationErrors();
     if (validationErrors.length > 0) {
@@ -139,12 +143,20 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
     setError(null);
 
     try {
-      await uploadTemplateApi(
-        selectedFile,
-        templateName || undefined,
-        mediaSlots.length > 0 ? mediaSlots : undefined,
-        (p: number) => setUploadProgress(p)
-      );
+      if (mode === 'edit' && initialTemplate) {
+        await updateTemplate(initialTemplate.id, {
+          name: templateName || undefined,
+          mediaSlots: mediaSlots.length > 0 ? mediaSlots : undefined,
+          isSlideTemplate: mediaSlots.length > 0
+        });
+      } else {
+        await uploadTemplateApi(
+          selectedFile!,
+          templateName || undefined,
+          mediaSlots.length > 0 ? mediaSlots : undefined,
+          (p: number) => setUploadProgress(p)
+        );
+      }
       onUploaded();
       onClose();
     } catch (err: any) {
@@ -161,7 +173,7 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
       <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col glass-card overflow-hidden animate-slide-up shadow-2xl ring-1 ring-white/10">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-dark-500/50 shrink-0">
-          <h2 className="text-lg font-display font-bold text-white">Upload Template</h2>
+          <h2 className="text-lg font-display font-bold text-white">{mode === 'edit' ? 'Edit Template Slots' : 'Upload Template'}</h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg bg-dark-600 hover:bg-dark-500 text-dark-200 hover:text-white flex items-center justify-center transition-colors"
@@ -231,12 +243,14 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
           {step === 'slots' && (
             <>
               {/* Back button */}
-              <button onClick={() => setStep('file')} className="text-dark-200 hover:text-white text-xs flex items-center space-x-1 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                </svg>
-                <span>Back to file</span>
-              </button>
+              {mode === 'upload' && (
+                <button onClick={() => setStep('file')} className="text-dark-200 hover:text-white text-xs flex items-center space-x-1 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  <span>Back to file</span>
+                </button>
+              )}
 
               <p className="text-xs text-dark-300">
                 Define media slots to tell the system where user-uploaded images/videos should appear in the timeline.
@@ -259,18 +273,35 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
                       </button>
                     </div>
 
-                    {/* Media Type */}
-                    <div>
-                      <label className="text-[10px] text-dark-300 uppercase tracking-wider mb-1 block">Media Type</label>
-                      <select
-                        value={slot.mediaType}
-                        onChange={(e) => updateSlot(idx, 'mediaType', e.target.value)}
-                        className="input-field text-xs !py-1.5 w-full"
-                      >
-                        <option value="image_or_video">Image or Video</option>
-                        <option value="image">Image Only</option>
-                        <option value="video">Video Only</option>
-                      </select>
+                    {/* Media Type & Sound */}
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-dark-300 uppercase tracking-wider mb-1 block">Media Type</label>
+                        <select
+                          value={slot.mediaType}
+                          onChange={(e) => updateSlot(idx, 'mediaType', e.target.value)}
+                          className="input-field text-xs !py-1.5 w-full"
+                        >
+                          <option value="image_or_video">Image or Video</option>
+                          <option value="image">Image Only</option>
+                          <option value="video">Video Only</option>
+                        </select>
+                      </div>
+                      
+                      {slot.mediaType !== 'image' && (
+                        <div className="flex items-center space-x-2 mt-4">
+                          <input
+                            type="checkbox"
+                            id={`mute-${idx}`}
+                            checked={slot.muted ?? false}
+                            onChange={(e) => updateSlot(idx, 'muted', e.target.checked)}
+                            className="w-4 h-4 rounded border-dark-400 bg-dark-700 text-primary-500 focus:ring-primary-500/30 focus:ring-offset-dark-800"
+                          />
+                          <label htmlFor={`mute-${idx}`} className="text-xs text-dark-200 cursor-pointer">
+                            Mute Sound
+                          </label>
+                        </div>
+                      )}
                     </div>
 
                     {/* Timing */}
@@ -405,10 +436,10 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
           {step === 'slots' && (
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || uploading || getValidationErrors().length > 0}
+              disabled={(mode === 'upload' && !selectedFile) || uploading || getValidationErrors().length > 0}
               className="btn-primary text-sm px-6 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {uploading ? 'Uploading...' : 'Upload Template'}
+              {uploading ? (mode === 'edit' ? 'Saving...' : 'Uploading...') : (mode === 'edit' ? 'Save Changes' : 'Upload Template')}
             </button>
           )}
         </div>

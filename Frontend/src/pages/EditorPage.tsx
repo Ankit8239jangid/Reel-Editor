@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import VideoUploader from '../components/VideoUploader';
 import VideoRecorder from '../components/VideoRecorder';
 import TemplateSelector from '../components/TemplateSelector';
-import PreviewPanel from '../components/PreviewPanel';
+
 import RenderButton from '../components/RenderButton';
 import RenderHistory from '../components/RenderHistory';
 import SlideUploader from '../components/SlideUploader';
@@ -144,15 +144,8 @@ const EditorPage: React.FC = () => {
 
           {/* ─── Center Panel: Canvas (Preview) - 5 cols ─── */}
           <div className="lg:col-span-5 flex flex-col h-full">
-            <div className="glass-card flex-1 p-6 flex flex-col overflow-y-auto custom-scrollbar">
-              <div className="mb-4">
-                <h2 className="text-lg font-display font-semibold text-white">Preview Canvas</h2>
-                <p className="text-xs text-dark-300">See how your media maps to the selected template.</p>
-              </div>
-              <PreviewPanel
-                selectedVideo={selectedVideo}
-                selectedTemplate={selectedTemplate}
-              />
+            <div className="glass-card flex-1 flex flex-col overflow-hidden custom-scrollbar">
+              <RenderHistory renders={renders} onRendersChange={loadRenders} />
             </div>
           </div>
 
@@ -275,11 +268,6 @@ const EditorPage: React.FC = () => {
                 onRenderComplete={loadRenders}
                 slideImages={slideImages.filter(img => img !== '')}
               />
-            </div>
-
-            {/* Render History */}
-            <div className="shrink-0 pb-4">
-              <RenderHistory renders={renders} onRendersChange={loadRenders} />
             </div>
 
           </div>

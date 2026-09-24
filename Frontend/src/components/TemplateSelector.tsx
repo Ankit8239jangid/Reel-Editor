@@ -17,6 +17,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   onTemplatesChange,
 }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -118,16 +119,26 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                     </div>
                   )}
 
-                  {/* Delete button */}
-                  <button
-                    onClick={(e) => handleDelete(e, template.id)}
-                    disabled={deletingId === template.id}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full bg-dark-900/80 hover:bg-red-500 text-dark-200 hover:text-white flex items-center justify-center backdrop-blur-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {/* Actions */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingTemplate(template); }}
+                      className="w-7 h-7 rounded-full bg-dark-900/80 hover:bg-primary-500 text-dark-200 hover:text-white flex items-center justify-center backdrop-blur-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.89 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.89l12.673-12.673z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(e, template.id)}
+                      disabled={deletingId === template.id}
+                      className="w-7 h-7 rounded-full bg-dark-900/80 hover:bg-red-500 text-dark-200 hover:text-white flex items-center justify-center backdrop-blur-sm disabled:opacity-50"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* Duration Badge */}
                   <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-dark-900/80 backdrop-blur-sm text-[10px] font-medium text-white">
@@ -156,11 +167,13 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
         )}
       </div>
 
-      {/* Upload Modal */}
-      {showUploadModal && (
+      {/* Upload/Edit Modal */}
+      {(showUploadModal || editingTemplate) && (
         <TemplateUploadModal
-          onClose={() => setShowUploadModal(false)}
-          onUploaded={onTemplatesChange}
+          onClose={() => { setShowUploadModal(false); setEditingTemplate(null); }}
+          onUploaded={() => { onTemplatesChange(); setEditingTemplate(null); }}
+          initialTemplate={editingTemplate || undefined}
+          mode={editingTemplate ? 'edit' : 'upload'}
         />
       )}
     </div>
