@@ -89,7 +89,7 @@ initDatabase();
 app.listen(PORT, () => {
   console.log(`
   ╔══════════════════════════════════════════════╗
-  ║   🎬 Reel Editor Backend                    ║
+  ║   🎬 Vibe Editor Backend                    ║
   ║   Running on: http://localhost:${PORT}         ║
   ║   Uploads:    ${path.resolve(UPLOAD_DIR).padEnd(27)}║
   ╚══════════════════════════════════════════════╝

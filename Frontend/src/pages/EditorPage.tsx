@@ -26,16 +26,16 @@ const EditorPage: React.FC = () => {
   const [slideImages, setSlideImages] = useState<string[]>([]);
 
   // Determine effective media slots (mediaSlots > legacy slideDurations)
-  const effectiveMediaSlots = selectedTemplate?.mediaSlots ?? 
-    (selectedTemplate?.isSlideTemplate && selectedTemplate?.slideDurations 
+  const effectiveMediaSlots = selectedTemplate?.mediaSlots ??
+    (selectedTemplate?.isSlideTemplate && selectedTemplate?.slideDurations
       ? selectedTemplate.slideDurations.map((dur, i) => ({
-          slotId: `legacy-${i}`,
-          order: i + 1,
-          mediaType: 'image_or_video' as const,
-          startTime: selectedTemplate.slideDurations!.slice(0, i).reduce((a, b) => a + b, 0),
-          endTime: selectedTemplate.slideDurations!.slice(0, i + 1).reduce((a, b) => a + b, 0),
-          duration: dur,
-        }))
+        slotId: `legacy-${i}`,
+        order: i + 1,
+        mediaType: 'image_or_video' as const,
+        startTime: selectedTemplate.slideDurations!.slice(0, i).reduce((a, b) => a + b, 0),
+        endTime: selectedTemplate.slideDurations!.slice(0, i + 1).reduce((a, b) => a + b, 0),
+        duration: dur,
+      }))
       : undefined);
 
   const hasMediaSlots = effectiveMediaSlots && effectiveMediaSlots.length > 0;
@@ -112,7 +112,7 @@ const EditorPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-display font-bold text-white">Reel Editor</h1>
+              <h1 className="text-xl font-display font-bold text-white">Vibe Editor</h1>
               <p className="text-xs text-dark-200">Create stunning vertical reels</p>
             </div>
           </div>
@@ -129,7 +129,7 @@ const EditorPage: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-[1600px] mx-auto px-6 py-6 h-[calc(100vh-73px)] overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-          
+
           {/* ─── Left Panel: Sidebar (Templates) - 3 cols ─── */}
           <div className="lg:col-span-3 flex flex-col h-full space-y-6">
             <div className="glass-card p-4 flex-1 overflow-hidden flex flex-col">
@@ -151,15 +151,14 @@ const EditorPage: React.FC = () => {
 
           {/* ─── Right Panel: Properties (Media & Rendering) - 4 cols ─── */}
           <div className="lg:col-span-4 flex flex-col h-full space-y-4 overflow-y-auto custom-scrollbar pr-2">
-            
+
             {/* Input Method */}
             <div className="glass-card overflow-hidden shrink-0">
               <div className="flex border-b border-dark-400/50">
                 <button
                   onClick={() => setActiveTab('upload')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    activeTab === 'upload' ? 'tab-active' : 'tab-inactive'
-                  }`}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 ${activeTab === 'upload' ? 'tab-active' : 'tab-inactive'
+                    }`}
                 >
                   <span className="flex items-center justify-center space-x-1.5">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -170,9 +169,8 @@ const EditorPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab('record')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    activeTab === 'record' ? 'tab-active' : 'tab-inactive'
-                  }`}
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-all duration-200 ${activeTab === 'record' ? 'tab-active' : 'tab-inactive'
+                    }`}
                 >
                   <span className="flex items-center justify-center space-x-1.5">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -185,7 +183,7 @@ const EditorPage: React.FC = () => {
 
               <div className="p-5">
                 {hasMediaSlots ? (
-                  <SlideUploader 
+                  <SlideUploader
                     mediaSlots={effectiveMediaSlots!}
                     slideImages={slideImages}
                     setSlideImages={setSlideImages}

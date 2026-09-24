@@ -1,4 +1,4 @@
-# Reel Editor – Automated Vertical Reel Generator
+# Vibe Editor – Automated Vertical Reel Generator
 
 A full-stack application for creating stunning vertical reels by combining your videos with green-screen templates.
 
