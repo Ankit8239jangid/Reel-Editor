@@ -14,20 +14,24 @@ const SlideUploader: React.FC<SlideUploaderProps> = ({ mediaSlots, slideImages, 
 
   const onDrop = useCallback(async (acceptedFiles: File[], idx: number) => {
     if (acceptedFiles.length === 0) return;
-    const file = acceptedFiles[0];
     
-    setUploadingIdx(idx);
-    try {
-      const filename = await uploadImage(file);
-      const newImages = [...slideImages];
-      newImages[idx] = filename;
-      setSlideImages(newImages);
-    } catch (err) {
-      console.error('Failed to upload image:', err);
-    } finally {
-      setUploadingIdx(null);
+    const newImages = [...slideImages];
+    for (let i = 0; i < acceptedFiles.length; i++) {
+      const targetIdx = idx + i;
+      if (targetIdx >= mediaSlots.length) break;
+      
+      const file = acceptedFiles[i];
+      setUploadingIdx(targetIdx);
+      try {
+        const filename = await uploadImage(file);
+        newImages[targetIdx] = filename;
+        setSlideImages([...newImages]);
+      } catch (err) {
+        console.error('Failed to upload image:', err);
+      }
     }
-  }, [slideImages, setSlideImages]);
+    setUploadingIdx(null);
+  }, [slideImages, setSlideImages, mediaSlots.length]);
 
   const getAcceptedTypes = (slot: MediaSlot): Record<string, string[]> => {
     if (slot.mediaType === 'image') {
@@ -66,7 +70,7 @@ const SlideUploader: React.FC<SlideUploaderProps> = ({ mediaSlots, slideImages, 
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-white">Upload Media for Template Slots</h3>
-      <p className="text-xs text-dark-300">Upload one file per slot. The template controls when each appears in the timeline.</p>
+      <p className="text-xs text-dark-300">Upload one or multiple files. You can drop multiple files into a slot to fill subsequent slots automatically.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {mediaSlots.map((slot, idx) => {
           const currentImage = slideImages[idx];
@@ -77,7 +81,7 @@ const SlideUploader: React.FC<SlideUploaderProps> = ({ mediaSlots, slideImages, 
               onDrop: (files) => onDrop(files, idx),
               accept: getAcceptedTypes(slot),
               maxSize: 50 * 1024 * 1024,
-              multiple: false,
+              multiple: true,
               disabled: isUploading,
             });
 
