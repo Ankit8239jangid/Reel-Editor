@@ -124,6 +124,7 @@ router.post('/', uploadTemplate.single('template'), async (req: Request, res: Re
       isSlideTemplate,
       slideDurations,
       mediaSlots,
+      previewVideo: req.body.previewVideo || undefined,
     };
 
     createTemplate(template);
@@ -147,6 +148,7 @@ router.put('/:id', (req: Request, res: Response) => {
     if (req.body.isSlideTemplate !== undefined) updates.isSlideTemplate = req.body.isSlideTemplate;
     if (req.body.slideDurations !== undefined) updates.slideDurations = req.body.slideDurations;
     if (req.body.mediaSlots !== undefined) updates.mediaSlots = req.body.mediaSlots;
+    if (req.body.previewVideo !== undefined) updates.previewVideo = req.body.previewVideo;
 
     updateTemplate(template.id, updates);
     res.json({ success: true, data: { ...template, ...updates } });

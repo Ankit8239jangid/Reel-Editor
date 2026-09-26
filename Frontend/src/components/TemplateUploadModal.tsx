@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { useDropzone } from 'react-dropzone';
 import { MediaSlot, Template } from '../types';
-import { uploadTemplate as uploadTemplateApi, updateTemplate } from '../api/client';
+import { uploadTemplate as uploadTemplateApi, updateTemplate, uploadImage } from '../api/client';
 
 interface TemplateUploadModalProps {
   onClose: () => void;
@@ -24,6 +24,7 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [step, setStep] = useState<'file' | 'slots'>(mode === 'edit' ? 'slots' : 'file');
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -143,17 +144,24 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
     setError(null);
 
     try {
+      let previewFilename: string | undefined;
+      if (previewFile) {
+        previewFilename = await uploadImage(previewFile);
+      }
+
       if (mode === 'edit' && initialTemplate) {
         await updateTemplate(initialTemplate.id, {
           name: templateName || undefined,
           mediaSlots: mediaSlots.length > 0 ? mediaSlots : undefined,
-          isSlideTemplate: mediaSlots.length > 0
+          isSlideTemplate: mediaSlots.length > 0,
+          ...(previewFilename && { previewVideo: previewFilename })
         });
       } else {
         await uploadTemplateApi(
           selectedFile!,
           templateName || undefined,
           mediaSlots.length > 0 ? mediaSlots : undefined,
+          previewFilename,
           (p: number) => setUploadProgress(p)
         );
       }
@@ -195,6 +203,30 @@ const TemplateUploadModal: React.FC<TemplateUploadModalProps> = ({ onClose, onUp
                 onChange={(e) => setTemplateName(e.target.value)}
                 className="input-field text-sm w-full"
               />
+
+              <div className="mt-4">
+                <label className="text-xs text-dark-300 uppercase tracking-wider mb-2 block">Banner Image / Preview Video (Optional)</label>
+                <div className="border border-dashed border-dark-400 hover:border-dark-300 rounded-lg p-4 text-center cursor-pointer transition-colors relative">
+                  <input 
+                    type="file" 
+                    accept="image/*,video/*"
+                    onChange={(e) => e.target.files && setPreviewFile(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {previewFile ? (
+                    <div className="text-emerald-400 text-sm font-medium flex items-center justify-center space-x-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{previewFile.name}</span>
+                    </div>
+                  ) : (
+                     <div className="text-dark-200 text-xs">
+                        <span className="text-primary-400">Browse</span> to upload preview media
+                     </div>
+                  )}
+                </div>
+              </div>
 
               <div
                 {...getRootProps()}

@@ -58,6 +58,7 @@ export async function uploadTemplate(
   file: File,
   name?: string,
   mediaSlots?: any[],
+  previewVideo?: string,
   onProgress?: (progress: number) => void
 ): Promise<Template> {
   const formData = new FormData();
@@ -66,6 +67,7 @@ export async function uploadTemplate(
   if (mediaSlots && mediaSlots.length > 0) {
     formData.append('mediaSlots', JSON.stringify(mediaSlots));
   }
+  if (previewVideo) formData.append('previewVideo', previewVideo);
 
   const { data } = await api.post<ApiResponse<Template>>('/templates', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

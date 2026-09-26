@@ -75,7 +75,7 @@ Manages templates which define where user media is inserted during a render.
 
 - **`POST /api/templates`**
   - **Description**: Uploads a template file, creating a dedicated folder, generating a thumbnail, and parsing media slots.
-  - **Payload**: `multipart/form-data` with field `template`. Can include `name`, `mediaSlots` (JSON string), `isSlideTemplate`, `slideDurations`.
+  - **Payload**: `multipart/form-data` with field `template`. Can include `name`, `mediaSlots` (JSON string), `isSlideTemplate`, `slideDurations`, and optionally `previewVideo` (filename of the uploaded banner image or preview video).
   - **Response**:
     ```json
     {
@@ -88,18 +88,20 @@ Manages templates which define where user media is inserted during a render.
         "thumbnail": "uuid/thumb.jpg",
         "createdAt": "date",
         "isSlideTemplate": false,
-        "mediaSlots": [...]
+        "mediaSlots": [...],
+        "previewVideo": "uuid.jpg"
       }
     }
     ```
 
 - **`PUT /api/templates/:id`**
-  - **Description**: Updates template metadata (name, slots, etc.).
+  - **Description**: Updates template metadata (name, slots, preview video, etc.).
   - **Payload (JSON)**:
     ```json
     {
       "name": "New Name",
-      "mediaSlots": [...]
+      "mediaSlots": [...],
+      "previewVideo": "new-uuid.jpg"
     }
     ```
   - **Response**: `{ "success": true, "data": UpdatedTemplate }`

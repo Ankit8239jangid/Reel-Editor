@@ -29,6 +29,7 @@ export interface Template {
   slideDurations?: number[];
   // New media slots system
   mediaSlots?: MediaSlot[];
+  previewVideo?: string;
 }
 
 export interface Render {
